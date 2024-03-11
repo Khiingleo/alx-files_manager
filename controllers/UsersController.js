@@ -11,16 +11,16 @@ class UsersController {
     const { email, password } = req.body;
 
     if (!email) {
-        return res.status(400).send({ error: 'Missing email' });
+      return res.status(400).send({ error: 'Missing email' });
     }
     if (!password) {
-        return res.status(400).send({ error: 'Missing password' });
+      return res.status(400).send({ error: 'Missing password' });
     }
     const emailExists = await dbClient.users.findOne({ email });
 
     if (emailExists) {
-        return res.status(400).send({ error: 'Already exist' });
-    } 
+      return res.status(400).send({ error: 'Already exist' });
+    }
 
     const pwd = sha1(password);
 
