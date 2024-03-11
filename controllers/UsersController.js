@@ -1,8 +1,9 @@
 import sha1 from 'sha1';
 import Queue from 'bull';
-// import { ObjectId } from 'mongodb';
+import { ObjectId } from 'mongodb';
 import dbClient from '../utils/db';
-// import redisClient from '../utils/redis';
+import { RedisClient } from 'redis';
+import redisClient from '../utils/redis';
 
 const userQ = new Queue('userQ');
 
@@ -39,6 +40,34 @@ class UsersController {
     });
 
     return res.status(201).send(createdUser);
+  }
+
+  static async getMe(request, response) {
+    async function getIdKey(request) {
+      const userData = { userId: null, key: null };
+
+      const token = request.header('X-Token');
+      if (!token) {
+        return userData;
+      }
+
+      userData.key = `auth_${token}`;
+      userData.userId = await redisClient.get(userData.key);
+
+      return userData;
+    }
+    const { userId } = await getIdKey(request);
+
+    const user = await dbClient.users.findOne({ _id: ObjectId(userId) });
+    if (!user) {
+      return response.status(401).send({ error: 'Unauthorized' });
+    }
+
+    const userData = { id: user._id, ...user };
+    delete userData._id;
+    delete userData.password;
+
+    return response.status(200).send(userData);
   }
 }
 
