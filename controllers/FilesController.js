@@ -9,9 +9,9 @@ import redisClient from '../utils/redis';
 class FilesController {
   static async postUpload(req, res) {
     const fileQ = new Queue('fileQ');
-    const dir = process.env.FOLDER_PATH || '/tmp/files_manager';
+    const path = process.env.FOLDER_PATH || '/tmp/files_manager';
 
-    async function getIdKey(req) {
+    async function findIdkey(req) {
       const userInfo = { userId: null, key: null };
 
       const token = req.header('X-Token');
@@ -25,7 +25,7 @@ class FilesController {
       return userInfo;
     }
 
-    const { userId } = await getIdKey(req);
+    const { userId } = await findIdkey(req);
 
     function isValidUser(id) {
       try {
@@ -96,9 +96,9 @@ class FilesController {
     const fileUid = uuidv4();
 
     const decData = Buffer.from(fileData, 'base64');
-    const filePath = `${dir}/${fileUid}`;
+    const filePath = `${path}/${fileUid}`;
 
-    mkdir(dir, { recursive: true }, (error) => {
+    mkdir(path, { recursive: true }, (error) => {
       if (error) {
         return res.status(400).send({ error: error.message });
       }
@@ -127,6 +127,38 @@ class FilesController {
       type: fileInsertData.type,
       isPublic: fileInsertData.isPublic,
       parentId: fileInsertData.parentId,
+    });
+  }
+
+  static async getShow(request, response) {
+    const token = request.headers['x-token'];
+    if (!token) { 
+       return response.status(401).json({ error: 'Unauthorized' }); 
+    }
+    const keyId = await redisClient.get(`auth_${token}`);
+    if (!keyId) {
+       return response.status(401).json({ error: 'Unauthorized' });
+    }
+    const user = await dbClient.db.collection('users').findOne({ _id: ObjectId(keyId) });
+    if (!user) {
+       return response.status(401).json({ error: 'Unauthorized' }); 
+    }
+
+    const idFile = request.params.id || '';
+    const fileDocument = await dbClient.db
+      .collection('files')
+      .findOne({ _id: ObjectId(idFile), userId: user._id });
+    if (!fileDocument) {
+      return response.status(404).send({ error: 'Not found' });  
+    }
+
+    return response.send({
+      id: fileDocument._id,
+      userId: fileDocument.userId,
+      name: fileDocument.name,
+      type: fileDocument.type,
+      isPublic: fileDocument.isPublic,
+      parentId: fileDocument.parentId,
     });
   }
 }
